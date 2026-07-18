@@ -1,5 +1,5 @@
 import React, { useContext, useState } from "react";
-import Navbar from "./navbar";
+import HomeNavbar from "./homeNavbar";
 import { Link, Navigate } from "react-router-dom";
 import "./form.css";
 import { Context } from "../..";
@@ -9,254 +9,188 @@ import axios from "axios";
 const Signup = () => {
   const [userId, setUserID] = useState("");
   const [bankName, setBankName] = useState("");
-  const [currency, setCurrency] = useState("");
-
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [password, setPassword] = useState("");
   const [usertype, setUsertype] = useState();
 
-  
   const { isAuthenticated, setIsAuthenticated, loading, setLoading } =
-  useContext(Context);
+    useContext(Context);
 
   const submitHandler = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
-      try {
-        // const { data } = await axios.post(
-        //   "http://localhost:3002/invoke?channelid=mychannel&chaincodeid=basictest&function=CreateUser&args=Havi_1&args=abc123&args=SBI&args=123456&args=0",
-        //   {
-        //     userId,
-        //     bankName,
-        //     bankAccountNumber,
-        //     password,
-        //     usertype,
-        //   },
-        //   {
-        //     headers: {
-        //       "Content-Type": "application/json",
-        //     },
-        //     withCredentials: true,
-        //   }
-        // );
 
-        const data = await axios.post(
-          'http://localhost:3002/invoke',
-          new URLSearchParams([
-            ['', ''],
-            ['channelid', 'mychannel'],
-            ['chaincodeid', 'basictest'],
-            ['function', 'CreateUser'],
-            ['args', userId],
-            ['args', password],
-            ['args', bankName],
-            ['args', bankAccountNumber],
-            ['args', usertype]
-          ])
+    try {
+      await axios.post(
+        "http://localhost:3002/invoke",
+        new URLSearchParams([
+          ["", ""],
+          ["channelid", "mychannel"],
+          ["chaincodeid", "basictest"],
+          ["function", "CreateUser"],
+          ["args", userId],
+          ["args", password],
+          ["args", bankName],
+          ["args", bankAccountNumber],
+          ["args", usertype],
+        ])
+      );
 
+      const resolvedCurrency =
+        bankName === "PNB" || bankName === "SBI" ? "INR" : "USD";
 
-        );
-        
-        console.log("hello this is signup", data.data);
+      await axios.post(
+        "http://localhost:3002/invoke",
+        new URLSearchParams([
+          ["", ""],
+          ["channelid", "mychannel"],
+          ["chaincodeid", "paytest"],
+          ["function", "CreateAccount"],
+          ["args", bankName],
+          ["args", resolvedCurrency],
+          ["args", bankAccountNumber],
+        ])
+      );
 
-
-        if(bankName==="PNB" || bankName==="SBI"){
-          setCurrency("INR");
-        }
-        else{
-          setCurrency("USD");
-        }
-
-        const bankAccountCreation = await axios.post(
-          'http://localhost:3002/invoke',
-          new URLSearchParams([
-            ['', ''],
-            ['channelid', 'mychannel'],
-            ['chaincodeid', 'paytest'],
-            ['function', 'CreateAccount'],
-            ['args', bankName],
-            ['args', currency],
-            ['args', bankAccountNumber] 
-          ])
-
-        );
-        // console.log("hello this is creation bank ", bankAccountCreation.data);
-        console.log("hello this is creation bank ", bankAccountCreation.data);
-        
-        // toast.success(bankAccountCreation.data);
-
-        // const data = await axios.get('http://localhost:3002/query', {
-        // params: {
-        //   'channelid': 'mychannel',
-        //   'chaincodeid': 'basictest',
-        //   'function': 'GetAllUsers',
-        //   // 'args': 'Asset123'
-        // }
-        // });
-        // console.log(data);
-        toast.success("Signup succesful");
-        window.localStorage.setItem("userId", userId);
-
-        setIsAuthenticated(true);
-        setLoading(false);
-      } catch (error) {
-        setIsAuthenticated(false);
-        toast.error("Signup failed. User already exists")
-        setLoading(false);
-      }
-    
+      toast.success("Signup successful");
+      window.localStorage.setItem("userId", userId);
+      setIsAuthenticated(true);
+      setLoading(false);
+    } catch (error) {
+      setIsAuthenticated(false);
+      toast.error("Signup failed. User already exists");
+      setLoading(false);
+    }
   };
 
-  if (isAuthenticated ) {
-    if(usertype === "1")
-    return <Navigate to={"/employer/home"} />;
-    else
+  if (isAuthenticated) {
+    if (usertype === "1") return <Navigate to={"/employer/home"} />;
     return <Navigate to={"/employee/home"} />;
   }
 
   return (
-    <div>
-      <Navbar />
-      <div className="reg">
-        <h2
-          style={{
-            textAlign: "center",
-            color: "black",
-            fontFamily: "Helvetica Neue",
-          }}
-        >
-          Sign Up
-        </h2>
-        <div className="form-container">
-          <form
-            className="card"
-            style={{ background: "#eeeeee" }}
-            onSubmit={submitHandler}
-          >
-            <div className="form my-4" style={{ textAlign: "center" }}>
-              <div className="text-center my-2">
-                &nbsp;&nbsp;
+    <div className="auth-page">
+      <HomeNavbar />
+
+      <main className="auth-main">
+        <div className="auth-container">
+          <div className="auth-panel-side">
+            <div className="auth-side-content">
+              <span className="auth-side-badge">Get Started</span>
+              <h2 className="auth-side-title">Join the BorderPay network</h2>
+              <p className="auth-side-text">
+                Create your account to send and receive cross-border payments
+                secured by Hyperledger Fabric blockchain technology.
+              </p>
+            </div>
+          </div>
+
+          <div className="auth-panel">
+            <h1 className="auth-heading">Create Account</h1>
+            <p className="auth-subheading">Fill in your details to get started</p>
+
+            <form className="auth-form" onSubmit={submitHandler}>
+              <div className="form-group">
+                <label htmlFor="userId">User ID</label>
                 <input
-                  type="string"
+                  id="userId"
+                  className="form-input"
+                  type="text"
                   name="id"
                   value={userId}
-                  onChange={(e) => {
-                    setUserID(e.target.value);
-                  }}
-                  placeholder="User ID"
-                  style={{ fontFamily: "Helvetica Neue" }}
-                  spellcheck="false"
+                  onChange={(e) => setUserID(e.target.value)}
+                  placeholder="Choose a user ID"
                   required
                 />
-              </div>
-              <div className="text-center my-2">
-                &nbsp;&nbsp;
-                <select
-                    name="bname"
-                    value={bankName}
-                    onChange={(e) => {
-                    setBankName(e.target.value);
-                    }}
-                    style={{ fontFamily: "Helvetica Neue", width: '210px', height: '25px'}}
-                    required
-                  >
-                    <option value="">Select Bank</option>
-                    <option value="PNB">Punjab National Bank</option>
-                    <option value="SBI">State Bank of India</option>
-                    <option value="BNY">Bank of NewYork</option>
-                    <option value="Barclays"> Barclays</option>
-                  </select>
-              </div>
-              <div className="text-center my-2">
-                &nbsp;&nbsp;
-                <input
-                  type="string"
-                  name="bacno"
-                  value={bankAccountNumber}
-                  onChange={(e) => {
-                    setBankAccountNumber(e.target.value);
-                  }}
-                  placeholder="Bank Account Number"
-                  style={{ fontFamily: "Helvetica Neue" }}
-                  spellcheck="false"
-                  required
-                />
-                <br />
               </div>
 
-              <div className="text-center my-2">
-                &nbsp;&nbsp;
+              <div className="form-group">
+                <label htmlFor="bankName">Bank</label>
+                <select
+                  id="bankName"
+                  className="form-select"
+                  name="bname"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  required
+                >
+                  <option value="">Select your bank</option>
+                  <option value="PNB">Punjab National Bank</option>
+                  <option value="SBI">State Bank of India</option>
+                  <option value="BNY">Bank of New York</option>
+                  <option value="Barclays">Barclays</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="bankAccountNumber">Bank Account Number</label>
                 <input
-                  type="password"
-                  name="password"
-                  title="password must contains atleast 8 character"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                  }}
-                  placeholder="Password"
-                  style={{ fontFamily: "Helvetica Neue" }}
-                  spellcheck="false"
+                  id="bankAccountNumber"
+                  className="form-input"
+                  type="text"
+                  name="bacno"
+                  value={bankAccountNumber}
+                  onChange={(e) => setBankAccountNumber(e.target.value)}
+                  placeholder="Enter account number"
                   required
                 />
-                <br />
               </div>
-              <div className="text-center my-2">
-                
-                &nbsp;&nbsp;
-                <label>
-                  <input
-                    type="radio"
-                    name="usertype"
-                    value="1"
-                    checked={usertype === "1"}
-                    onChange={(e) => {
-                      setUsertype(e.target.value);
-                    }}
-                    style={{ fontFamily: "Helvetica Neue" }}
-                    required
-                  />
-                  Employer
-                </label>
-                &nbsp;&nbsp;&nbsp;
-                <label>
-                  <input
-                    type="radio"
-                    name="usertype"
-                    value="0"
-                    checked={usertype === "0"}
-                    onChange={(e) => {
-                      setUsertype(e.target.value);
-                    }}
-                    style={{ fontFamily: "Helvetica Neue" }}
-                    required
-                  />
-                  Employee
-                </label>
-                <br />
+
+              <div className="form-group">
+                <label htmlFor="signup-password">Password</label>
+                <input
+                  id="signup-password"
+                  className="form-input"
+                  type="password"
+                  name="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password"
+                  required
+                />
               </div>
-              
-              <div className="text-center my-2">
-                <button
-                  disabled={loading}
-                  id="click"
-                  type="submit"
-                  style={{ border: "none", fontFamily: "Helvetica Neue" }}
-                >
-                  Sign Up
-                </button>
+
+              <div className="form-group">
+                <label>I am a</label>
+                <div className="role-selector">
+                  <div className="role-option">
+                    <input
+                      type="radio"
+                      id="signup-employer"
+                      name="usertype"
+                      value="1"
+                      checked={usertype === "1"}
+                      onChange={(e) => setUsertype(e.target.value)}
+                      required
+                    />
+                    <label htmlFor="signup-employer">Employer</label>
+                  </div>
+                  <div className="role-option">
+                    <input
+                      type="radio"
+                      id="signup-employee"
+                      name="usertype"
+                      value="0"
+                      checked={usertype === "0"}
+                      onChange={(e) => setUsertype(e.target.value)}
+                      required
+                    />
+                    <label htmlFor="signup-employee">Employee</label>
+                  </div>
+                </div>
               </div>
-              <div className="text-center my-2">
-                Already have an account?{" "}
-                <Link to="/login" style={{ fontFamily: "Helvetica Neue" }}>
-                  Sign In
-                </Link>
-              </div>
-            </div>
-          </form>
+
+              <button className="auth-submit" type="submit" disabled={loading}>
+                {loading ? "Creating account..." : "Create Account"}
+              </button>
+            </form>
+
+            <p className="auth-footer-text">
+              Already have an account? <Link to="/login">Sign in</Link>
+            </p>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

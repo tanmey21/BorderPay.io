@@ -34,7 +34,7 @@ To install and run the frontend, follow these steps:
 2. Navigate to the frontend directory:
 
    ```bash
-   cd frontend
+   cd Blockchain_frontend
    ```
 
 3. Install dependencies:

@@ -1,0 +1,10 @@
+# Python virtual environment
+.venv/
+venv/
+
+# OS
+.DS_Store
+
+
+#Node modules
+Blockchain_frontend/.npm-cache/

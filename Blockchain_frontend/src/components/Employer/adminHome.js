@@ -5,6 +5,7 @@ import "../Employee/contracts.css";
 import CreateContract from './createContract';
 import toast from "react-hot-toast";
 import ShowBalance from './showBalance';
+import { parseQueryResponse } from '../../utils/parseQueryResponse';
 const AdminHome = () => {
 
   const  logeduserid = window.localStorage.getItem("userId");
@@ -38,36 +39,6 @@ const AdminHome = () => {
     // }
   ]);
   const [flag , setFlag] = useState(true);
-
-
-  const banckdetails = async () => {
-    // try {
-      
-
-      const response = await axios.get('http://localhost:3002/query', {
-        params: {
-        'channelid': 'mychannel',
-        'chaincodeid': 'basictest',
-        'function': 'GetBankDetails',
-        'args': logeduserid
-        }
-      });
-      
-      console.log(response);
-      console.log("this " , response.data);
-
-      // const substring = response.data.substring(10);
-      // const jsonData = JSON.parse(substring);
-      
-      // console.log(jsonData);
-      
-    // } catch (error) {
-    //   toast.error("Error fetching contracts");
-    //   console.error('Error fetching contracts:', error);
-    // }
-  };
-  banckdetails();
-
 
   const handlePayment = async (b1,bn1,b2,bn2,pay,status) => {
     if(status === "Pending" || status === "Revoked"){
@@ -138,8 +109,7 @@ const AdminHome = () => {
         console.log(response);
         console.log("this" , response.data);
 
-        const substring = response.data.substring(10);
-        const jsonData = JSON.parse(substring);
+        const jsonData = parseQueryResponse(response.data) ?? [];
         
         setCreatedContracts(jsonData);
 

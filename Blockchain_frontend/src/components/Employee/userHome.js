@@ -4,6 +4,7 @@ import axios from 'axios';
 import "./contracts.css"
 import toast from "react-hot-toast";
 import ShowBalance from '../Employer/showBalance.js';
+import { parseQueryResponse } from '../../utils/parseQueryResponse';
 const UserHome = () => {
   
   const  logeduserid = window.localStorage.getItem("userId");
@@ -79,8 +80,7 @@ const UserHome = () => {
         
         console.log(response);
         
-        const substring = response.data.substring(10);
-        const jsonData = JSON.parse(substring);
+        const jsonData = parseQueryResponse(response.data) ?? [];
         setCreatedContracts(jsonData);
       } catch (error) {
         console.error('Error fetching contracts:', error);

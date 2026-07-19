@@ -24,10 +24,9 @@ func (setup OrgSetup) Query(w http.ResponseWriter, r *http.Request) {
 	contract := network.GetContract(chainCodeName)
 	evaluateResponse, err := contract.EvaluateTransaction(function, args...)
 	if err != nil {
-		// fmt.Fprintf(w, "Error: %s", err)
-		fmt.Println("error querying..")
+		fmt.Println("error querying:", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Error querying..."))
+		fmt.Fprintf(w, "Error querying: %s", err)
 		return
 	}
 	if len(evaluateResponse) == 0 {

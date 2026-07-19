@@ -1,4 +1,4 @@
-module github.com/hyperledger/fabric-samples/borderpay/chaincode-go
+module github.com/hyperledger/fabric-samples/borderpay/chaincode2-go
 
 go 1.17
 

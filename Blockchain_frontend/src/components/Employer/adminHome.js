@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import AdminNavbar from "./adminNavbar";
 import axios from "axios";
 import CreateContract from "./createContract";
 import toast from "react-hot-toast";
 import ShowBalance from "./showBalance";
+import RunBookLog from "../shared/RunBookLog";
 import { parseQueryResponse } from "../../utils/parseQueryResponse";
+import { parseInvokeResponse } from "../../utils/parseInvokeResponse";
+import { appendRunBookLog } from "../../utils/runBookStorage";
 import "./employerDashboard.css";
 
 const getStatusClass = (status) => {
@@ -18,6 +21,9 @@ const AdminHome = () => {
   const logeduserid = window.localStorage.getItem("userId");
   const [createdContracts, setCreatedContracts] = useState([]);
   const [loadingContracts, setLoadingContracts] = useState(true);
+  const [runBookRefreshKey, setRunBookRefreshKey] = useState(0);
+  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
+  const balanceRef = useRef(null);
 
   const fetchContracts = useCallback(async () => {
     try {
@@ -44,27 +50,51 @@ const AdminHome = () => {
     fetchContracts();
   }, [fetchContracts]);
 
-  const handlePayment = async (b1, bn1, b2, bn2, pay, status) => {
+  const handlePayment = async (contract, pay, status) => {
     if (status === "Pending" || status === "Revoked") {
       toast.error("Contract is inactive");
       return;
     }
     try {
-      await axios.post(
+      const response = await axios.post(
         "http://localhost:3002/invoke",
         new URLSearchParams([
           ["", ""],
           ["channelid", "mychannel"],
           ["chaincodeid", "paytest"],
           ["function", "MakePayment"],
-          ["args", b1],
-          ["args", bn1],
-          ["args", b2],
-          ["args", bn2],
+          ["args", contract.BankName_Employer],
+          ["args", contract.BankAccountNumber_Employer],
+          ["args", contract.BankName_Employee],
+          ["args", contract.BankAccountNumber_Employee],
           ["args", pay],
         ])
       );
+
+      const { fabricTxId, result } = parseInvokeResponse(response.data);
+
+      appendRunBookLog(logeduserid, {
+        event: "payment_sent",
+        timestamp: new Date().toISOString(),
+        fabricTxId,
+        paymentTxId: result || null,
+        contractId: contract.ContractID,
+        employerId: contract.EmployerId || logeduserid,
+        employeeId: contract.EmployeeId,
+        amount: pay,
+        senderBank: contract.BankName_Employer,
+        senderAccount: contract.BankAccountNumber_Employer,
+        receiverBank: contract.BankName_Employee,
+        receiverAccount: contract.BankAccountNumber_Employee,
+        contractStatus: contract.STATUS,
+        role: "employer",
+      });
+
       toast.success("Payment successful");
+      setRunBookRefreshKey((key) => key + 1);
+      setBalanceRefreshKey((key) => key + 1);
+      balanceRef.current?.refreshBalance();
+      fetchContracts();
     } catch (error) {
       toast.error("Payment failed");
       console.error("Error making payment:", error);
@@ -111,7 +141,11 @@ const AdminHome = () => {
 
         <div className="employer-grid">
           <CreateContract onContractCreated={fetchContracts} />
-          <ShowBalance logeduserid={logeduserid} />
+          <ShowBalance
+            ref={balanceRef}
+            logeduserid={logeduserid}
+            refreshKey={balanceRefreshKey}
+          />
         </div>
 
         <section className="contracts-section">
@@ -172,16 +206,7 @@ const AdminHome = () => {
                     <button
                       className="btn-pay"
                       disabled={isPaymentDisabled(contract.STATUS)}
-                      onClick={() =>
-                        handlePayment(
-                          contract.BankName_Employer,
-                          contract.BankAccountNumber_Employer,
-                          contract.BankName_Employee,
-                          contract.BankAccountNumber_Employee,
-                          contract.Payment,
-                          contract.STATUS
-                        )
-                      }
+                      onClick={() => handlePayment(contract, contract.Payment, contract.STATUS)}
                     >
                       Send Payment
                     </button>
@@ -197,6 +222,13 @@ const AdminHome = () => {
             </div>
           )}
         </section>
+
+        <RunBookLog
+          logeduserid={logeduserid}
+          role="employer"
+          contracts={createdContracts}
+          refreshKey={runBookRefreshKey}
+        />
       </main>
     </div>
   );

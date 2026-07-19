@@ -516,4 +516,108 @@
   .contract-actions {
     flex-direction: column;
   }
+
+  .runbook-meta-grid {
+    grid-template-columns: 1fr;
+  }
 }
+
+.runbook-section {
+  margin-top: 2rem;
+}
+
+.runbook-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.runbook-entry {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+}
+
+.runbook-entry-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.runbook-event {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.runbook-event-payment_sent {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.runbook-event-payment_received {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.runbook-event-contract_payment {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.runbook-timestamp {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.runbook-amount {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.runbook-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem 1.25rem;
+}
+
+.runbook-meta-item label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin-bottom: 0.2rem;
+}
+
+.runbook-meta-item span {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #334155;
+  word-break: break-word;
+}
+
+.runbook-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+}
+
+.runbook-source {
+  text-transform: capitalize;
+}
+

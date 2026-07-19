@@ -1,81 +1,116 @@
-# BorderPay.Io
+# BorderPay.io
 
-## Pre-requisites for Hyperledger Fabric
+> A blockchain-powered cross-border payment platform built on **Hyperledger Fabric** for secure employer–employee payroll and contract management.
 
-Before setting up this project, ensure you have the following pre-requisites installed:
+**CS731 End Term Project · IIT Kanpur**
 
-- [Docker](https://docs.docker.com/engine/install/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-- [Go Programming Language (version >= 1.20)](https://golang.org/doc/install)
-- [Node.js (version >= 12.x)](https://nodejs.org/en/download/)
-- [npm](https://www.npmjs.com/get-npm)
-- [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+---
 
-For detailed installation instructions of HyperLedger -Fabric, refer to the [Hyperledger Fabric documentation](https://hyperledger-fabric.readthedocs.io/en/latest/getting_started.html).
+## Overview
 
-## Description
+BorderPay enables employers and employees to create accounts, manage smart contracts, and execute cross-border payments — all recorded on a tamper-proof distributed ledger. The system uses a React frontend, a Go REST API, and two chaincodes deployed on a multi-org Fabric test network.
 
-This repository contains the following folder:
+### Key Features
 
-1. `Blockchain_frontend` - Contains frontend part of the application
-2. `borderpay` - it contains chaincodes and API-server in `rest-api-go` folder
-3. `CS731_Project_Report` - It contains Project Report 
+- **User management** — Employer and employee registration with role-based access
+- **Smart contracts** — On-chain employment contracts with configurable payment terms
+- **Cross-border payments** — Multi-currency support (INR, USD) via integrated bank accounts
+- **Blockchain security** — All transactions recorded on Hyperledger Fabric with private data collections
+- **REST API gateway** — Go server bridging the frontend to Fabric chaincodes
 
-## Frontend Installation
+---
 
-To install and run the frontend, follow these steps:
+## Architecture
 
-1. Clone the repository:
+```
+┌─────────────────────┐       ┌─────────────────────┐       ┌──────────────────────────────┐
+│   React Frontend    │ HTTP  │   Go REST API       │ gRPC  │   Hyperledger Fabric Network │
+│   (port 3000)       │──────▶│   (port 3002)       │──────▶│   Org1 + Org2 · CouchDB     │
+└─────────────────────┘       └─────────────────────┘       └──────────────────────────────┘
+                                                                        │
+                                                              ┌─────────┴─────────┐
+                                                              │  basictest        │
+                                                              │  paytest          │
+                                                              │  (chaincodes)     │
+                                                              └───────────────────┘
+```
 
-   ```bash
-   git clone https://github.com/havibohra/BorderPay.Io.git
-   ```
+| Layer | Technology | Port |
+|-------|-----------|------|
+| Frontend | React 18 | `3000` |
+| REST API | Go + Fabric Gateway SDK | `3002` |
+| Blockchain | Hyperledger Fabric 2.5.x | `7050`, `7051`, `9051` |
+| State DB | CouchDB | `5984` |
 
-2. Navigate to the frontend directory:
+---
 
-   ```bash
-   cd Blockchain_frontend
-   ```
+## Prerequisites
 
-3. Install dependencies:
+| Tool | Version | Link |
+|------|---------|------|
+| Docker | Latest | [Install Docker](https://docs.docker.com/engine/install/) |
+| Docker Compose | v2+ | [Install Compose](https://docs.docker.com/compose/install/) |
+| Go | ≥ 1.20 | [Install Go](https://golang.org/doc/install) |
+| Node.js | ≥ 18 LTS | [Install Node.js](https://nodejs.org/) |
+| npm | Latest | Bundled with Node.js |
+| Git | Latest | [Install Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) |
 
-   ```bash
-   npm install
-   ```
+> **Note:** Docker Desktop must be running before starting the Fabric network.
 
-4. Start the frontend server:
+For Fabric-specific setup, see the [Hyperledger Fabric documentation](https://hyperledger-fabric.readthedocs.io/en/latest/getting_started.html).
 
-   ```bash
-   npm start
-   ```
-5.Access the application in your browser at `http://localhost:3000`.
-## Setup Details
+---
 
-Follow these steps to set up and run the project:
+## Getting Started
 
-1. Copy the `borderpay` folder from the repo inside the folder `fabric-samples` of Hyperledger-Fabric
-2. 
+### 1. Clone the repository
+
 ```bash
-#To avoid any permissions problem:
-   sudo bash
-# navigate to test-network folder in fabric-samples
+git clone https://github.com/tanmey21/BorderPay.io.git
+cd BorderPay.Io
+```
 
-# Start with creating channel named mychannel and setting Peer state database to deploy: couchdb with ca
+## Running the Project
 
-./network.sh up  createChannel -c mychannel -ca -s couchdb
+You need **three terminals** — one for the blockchain network, one for the API, and one for the frontend. All paths below are relative to the repo root (`BorderPay.io/`).
 
-# deploying chaincodes to peers 
+### Terminal 1 — Start the Fabric network
 
-./network.sh deployCC -ccn basictest  -ccp ../borderpay/chaincode-go  -ccl go -ccep "OR('Org1MSP.peer','Org2MSP.peer')"  -cccg '../borderpay/chaincode-go/collections_config.json' -ccep "OR('Org1MSP.peer','Org2MSP.peer')"
+```bash
+cd fabric-samples/test-network
 
-./network.sh deployCC -ccn paytest  -ccp ../borderpay/chaincode2-go  -ccl go -ccep "OR('Org1MSP.peer','Org2MSP.peer')"  -cccg '../borderpay/chaincode2-go/collections2_config.json' -ccep "OR('Org1MSP.peer','Org2MSP.peer')"
+# Tear down any existing network
+./network.sh down
 
-# required environment variables setup
+# Start network with CouchDB and Certificate Authority
+./network.sh up createChannel -c mychannel -ca -s couchdb
+```
 
+Deploy both chaincodes:
+
+```bash
+# basictest — user management & authentication
+./network.sh deployCC \
+  -ccn basictest \
+  -ccp ../borderpay/chaincode-go \
+  -ccl go \
+  -ccep "OR('Org1MSP.peer','Org2MSP.peer')" \
+  -cccg '../borderpay/chaincode-go/collections_config.json'
+
+# paytest — payments & smart contracts
+./network.sh deployCC \
+  -ccn paytest \
+  -ccp ../borderpay/chaincode2-go \
+  -ccl go \
+  -ccep "OR('Org1MSP.peer','Org2MSP.peer')" \
+  -cccg '../borderpay/chaincode2-go/collections2_config.json'
+```
+
+Initialize the payment ledger:
+
+```bash
 export PATH=${PWD}/../bin:$PATH
 export FABRIC_CFG_PATH=$PWD/../config/
-
-# Environment variables for Org1, login as peer0.org1
 
 export CORE_PEER_TLS_ENABLED=true
 export CORE_PEER_LOCALMSPID="Org1MSP"
@@ -83,12 +118,76 @@ export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org1.e
 export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
 export CORE_PEER_ADDRESS=localhost:7051
 
-peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C mychannel -n paytest --peerAddresses localhost:7051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{"function":"InitLedger","Args":[]}'
+peer chaincode invoke \
+  -o localhost:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  --tls \
+  --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" \
+  -C mychannel \
+  -n paytest \
+  --peerAddresses localhost:7051 \
+  --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" \
+  --peerAddresses localhost:9051 \
+  --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" \
+  -c '{"function":"InitLedger","Args":[]}'
+```
 
-#Start a new terminal
+### Terminal 2 — Start the REST API
 
-# navigate to rest-api-go folder(run this command if you're in test-network currently)
-cd ../borderpay/rest-api-go
-# start api-server (It will start api-sever on port:3002)
+```bash
+cd fabric-samples/borderpay/rest-api-go
+go mod download
 go run main.go
-   ```
+```
+
+The API server starts on **http://localhost:3002**.
+
+### Terminal 3 — Start the frontend
+
+```bash
+cd Blockchain_frontend
+npm install
+npm start
+```
+
+Open **http://localhost:3000** in your browser.
+
+---
+
+## Usage
+
+1. **Sign up** as an Employer or Employee with your bank details
+2. **Employers** can create payment contracts and send cross-border payments
+3. **Employees** can view contracts, accept terms, and track incoming payments
+4. All transactions are recorded on the Hyperledger Fabric ledger
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `infoln: command not found` | Ensure `fabric-samples/test-network/scripts/` exists; re-run the Fabric install script |
+| `ERR_OSSL_EVP_UNSUPPORTED` on `npm start` | Use Node 18/20 LTS or upgrade to `react-scripts@5.x` |
+| Port 3000 already in use | Run `kill -9 $(lsof -t -i:3000)` |
+| Docker not running | Start Docker Desktop before `./network.sh up` |
+| Chaincode deploy fails | Run `./network.sh down` first, then restart the network |
+| API can't connect to peer | Ensure the Fabric network is running and env vars are exported |
+
+---
+
+## Team
+
+| Name | Roll Number |
+|------|-------------|
+| Havi Bohra | 210429 |
+| Satyam Gupta | 210942 |
+| Tanmey Agarwal | 211098 |
+
+---
+
+## References
+
+- [Hyperledger Fabric Documentation](https://hyperledger-fabric.readthedocs.io/en/latest/)
+- [Fabric Test Network Guide](https://hyperledger-fabric.readthedocs.io/en/latest/test_network.html)
+- [Hyperledger Fabric Samples](https://github.com/hyperledger/fabric-samples)

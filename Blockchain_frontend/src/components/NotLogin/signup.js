@@ -1,6 +1,6 @@
 import React, { useContext, useState } from "react";
 import HomeNavbar from "./homeNavbar";
-import { Link, Navigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./form.css";
 import { Context } from "../..";
 import toast from "react-hot-toast";
@@ -13,8 +13,8 @@ const Signup = () => {
   const [password, setPassword] = useState("");
   const [usertype, setUsertype] = useState();
 
-  const { isAuthenticated, setIsAuthenticated, loading, setLoading } =
-    useContext(Context);
+  const { loading, setLoading } = useContext(Context);
+  const navigate = useNavigate();
 
   const submitHandler = async (e) => {
     e.preventDefault();
@@ -52,21 +52,14 @@ const Signup = () => {
         ])
       );
 
-      toast.success("Signup successful");
-      window.localStorage.setItem("userId", userId);
-      setIsAuthenticated(true);
+      toast.success("Account created! Please sign in.");
       setLoading(false);
+      navigate("/login");
     } catch (error) {
-      setIsAuthenticated(false);
       toast.error("Signup failed. User already exists");
       setLoading(false);
     }
   };
-
-  if (isAuthenticated) {
-    if (usertype === "1") return <Navigate to={"/employer/home"} />;
-    return <Navigate to={"/employee/home"} />;
-  }
 
   return (
     <div className="auth-page">

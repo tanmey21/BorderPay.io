@@ -3,6 +3,7 @@ import UserNavbar from "./userNavbar.js";
 import axios from "axios";
 import toast from "react-hot-toast";
 import ShowBalance from "../Employer/showBalance.js";
+import RunBookLog from "../shared/RunBookLog.js";
 import { parseQueryResponse } from "../../utils/parseQueryResponse";
 import "../Employer/employerDashboard.css";
 
@@ -17,6 +18,7 @@ const UserHome = () => {
   const logeduserid = window.localStorage.getItem("userId");
   const [createdContracts, setCreatedContracts] = useState([]);
   const [loadingContracts, setLoadingContracts] = useState(true);
+  const [runBookRefreshKey, setRunBookRefreshKey] = useState(0);
 
   const fetchContracts = useCallback(async () => {
     try {
@@ -57,6 +59,7 @@ const UserHome = () => {
       );
       toast.success("Contract revoked");
       fetchContracts();
+      setRunBookRefreshKey((key) => key + 1);
     } catch (error) {
       console.error("Error making revoke", error);
       toast.error("Revoke failed");
@@ -77,6 +80,7 @@ const UserHome = () => {
       );
       toast.success("Contract accepted");
       fetchContracts();
+      setRunBookRefreshKey((key) => key + 1);
     } catch (error) {
       toast.error("Accept failed");
       console.error("Error making accept", error);
@@ -210,6 +214,13 @@ const UserHome = () => {
             </div>
           )}
         </section>
+
+        <RunBookLog
+          logeduserid={logeduserid}
+          role="employee"
+          contracts={createdContracts}
+          refreshKey={runBookRefreshKey}
+        />
       </main>
     </div>
   );

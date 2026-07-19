@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
@@ -38,6 +39,7 @@ type Transaction struct {
 	Receiver_Acc_No string  `json:"Receiver_Acc_No"`
 	Amount          float64 `json:"Amount"`
 	Currency        string  `json:"Currency"`
+	Timestamp       string  `json:"Timestamp"`
 }
 
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
@@ -157,33 +159,58 @@ func (s *SmartContract) GetAllBanks(ctx contractapi.TransactionContextInterface)
 }
 
 func (s *SmartContract) GetAllTransactions(ctx contractapi.TransactionContextInterface) ([]Transaction, error) {
-	// Get an iterator over all the Banks in the ledger
-	resultsIterator, err := ctx.GetStub().GetPrivateDataByRange("Transaction_Collections", "", "")
+	lastIDBytes, err := ctx.GetStub().GetPrivateData("Transaction_Collections", "last_id")
 	if err != nil {
 		return nil, err
 	}
-	defer resultsIterator.Close()
 
-	// Create an empty slice to store the contracts
 	var allT []Transaction
+	if lastIDBytes == nil {
+		return allT, nil
+	}
 
-	// Iterate over the contracts and add them to the slice
-	for resultsIterator.HasNext() {
-		transJSON, err := resultsIterator.Next()
+	lastID, err := strconv.Atoi(string(lastIDBytes))
+	if err != nil || lastID < 1 {
+		return allT, nil
+	}
+
+	for i := 1; i <= lastID; i++ {
+		key := strconv.Itoa(i)
+		txJSON, err := ctx.GetStub().GetPrivateData("Transaction_Collections", key)
 		if err != nil {
 			return nil, err
 		}
+		if txJSON == nil {
+			continue
+		}
 
 		var T Transaction
-		err = json.Unmarshal(transJSON.Value, &T)
+		err = json.Unmarshal(txJSON, &T)
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		allT = append(allT, T)
 	}
 
 	return allT, nil
+}
+
+func (s *SmartContract) GetTransactionsByAccount(ctx contractapi.TransactionContextInterface, bankName string, accountNo string) ([]Transaction, error) {
+	allT, err := s.GetAllTransactions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []Transaction
+	for _, t := range allT {
+		if (t.Sender_Bank == bankName && t.Sender_Acc_No == accountNo) ||
+			(t.Receiver_Bank == bankName && t.Receiver_Acc_No == accountNo) {
+			filtered = append(filtered, t)
+		}
+	}
+
+	return filtered, nil
 }
 
 func (s *SmartContract) CreateAccount(ctx contractapi.TransactionContextInterface, bank_name string, currency string, account_no string) (string, error) {
@@ -217,73 +244,119 @@ func (s *SmartContract) CreateAccount(ctx contractapi.TransactionContextInterfac
 	return "Account added on Hyperledger", nil
 }
 
-func execute(ctx contractapi.TransactionContextInterface, src Bank, src_bank_acc_no string, receiver Bank, receiver_bank_acc_no string, amount float64, rate float64 /*conversion b/w curr*/) (string, error) { //executes transactions after all checks are done
-	//Adding amount to receiver's Account
-	fmt.Printf("The src bank is %s\n", src.Bank_Name)
-	fmt.Printf("The src bank is %s\n", receiver.Bank_Name)
-	account_rec := receiver.Account_Map[receiver_bank_acc_no]
-	account_rec.Balance += (float64(amount) * rate)
-	receiver.Account_Map[receiver_bank_acc_no] = account_rec
-	//Subtracting amount from sender's Accountf
-	account_send := src.Account_Map[src_bank_acc_no]
-	account_send.Balance -= amount
-	src.Account_Map[src_bank_acc_no] = account_send
+func loadBank(ctx contractapi.TransactionContextInterface, bankName string) (Bank, error) {
+	bankJSON, err := ctx.GetStub().GetPrivateData("Bank_Collections", bankName)
+	if err != nil {
+		return Bank{}, fmt.Errorf("failed to get bank %s: %v", bankName, err)
+	}
+	if bankJSON == nil {
+		return Bank{}, fmt.Errorf("bank %s does not exist", bankName)
+	}
 
-	fmt.Printf("The value of rc %f\n", src.Account_Map[src_bank_acc_no].Balance)
-	//Updating changes in world state
-	srcJSON, err := json.Marshal(src)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal src bank: %v", err)
+	var bank Bank
+	if err := json.Unmarshal(bankJSON, &bank); err != nil {
+		return Bank{}, fmt.Errorf("failed to unmarshal bank %s: %v", bankName, err)
 	}
-	err = ctx.GetStub().PutPrivateData("Bank_Collections", src.Bank_Name, srcJSON)
-	if err != nil {
-		return "", fmt.Errorf("failed to update src bank %s is world state: %v", src.Bank_Name, err)
-	}
-	receiverJSON, err := json.Marshal(receiver)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal receiver bank: %v", err)
-	}
-	err = ctx.GetStub().PutPrivateData("Bank_Collections", receiver.Bank_Name, receiverJSON)
-	if err != nil {
-		return "", fmt.Errorf("failed to update receiver bank %s is world state: %v", receiver.Bank_Name, err)
-	}
-	fmt.Printf("New_amt is:4\n")
+	return bank, nil
+}
 
-	//Creating Transaction ID
-	transaction_id, err := strconv.Atoi(string(last_id))
-	var li int
-	li, err = strconv.Atoi(string(last_id))
-	li += 1
-	last_id = strconv.Itoa(li)
+func saveBank(ctx contractapi.TransactionContextInterface, bank Bank) error {
+	bankJSON, err := json.Marshal(bank)
 	if err != nil {
-		return "", fmt.Errorf("failed to convert last transaction id to int: %v", err)
+		return fmt.Errorf("failed to marshal bank %s: %v", bank.Bank_Name, err)
 	}
-	transaction_id += 1
-	//Creating Transaction
+	return ctx.GetStub().PutPrivateData("Bank_Collections", bank.Bank_Name, bankJSON)
+}
+
+func execute(ctx contractapi.TransactionContextInterface, src Bank, src_bank_acc_no string, receiver Bank, receiver_bank_acc_no string, amount float64, rate float64 /*conversion b/w curr*/) (string, error) {
+	srcBank, err := loadBank(ctx, src.Bank_Name)
+	if err != nil {
+		return "", err
+	}
+
+	senderAccount, ok := srcBank.Account_Map[src_bank_acc_no]
+	if !ok {
+		return "", fmt.Errorf("sender account %s does not exist in bank %s", src_bank_acc_no, src.Bank_Name)
+	}
+
+	var receiverBank Bank
+	if src.Bank_Name == receiver.Bank_Name {
+		receiverBank = srcBank
+	} else {
+		receiverBank, err = loadBank(ctx, receiver.Bank_Name)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	receiverAccount, ok := receiverBank.Account_Map[receiver_bank_acc_no]
+	if !ok {
+		return "", fmt.Errorf("receiver account %s does not exist in bank %s", receiver_bank_acc_no, receiver.Bank_Name)
+	}
+
+	senderAccount.Balance -= amount
+	receiverAccount.Balance += amount * rate
+	srcBank.Account_Map[src_bank_acc_no] = senderAccount
+	receiverBank.Account_Map[receiver_bank_acc_no] = receiverAccount
+
+	if src.Bank_Name == receiver.Bank_Name {
+		if err := saveBank(ctx, srcBank); err != nil {
+			return "", err
+		}
+	} else {
+		if err := saveBank(ctx, srcBank); err != nil {
+			return "", err
+		}
+		if err := saveBank(ctx, receiverBank); err != nil {
+			return "", err
+		}
+	}
+
+	lastIDBytes, err := ctx.GetStub().GetPrivateData("Transaction_Collections", "last_id")
+	if err != nil {
+		return "", err
+	}
+
+	transactionID := 0
+	if lastIDBytes != nil {
+		transactionID, err = strconv.Atoi(string(lastIDBytes))
+		if err != nil {
+			return "", fmt.Errorf("failed to convert last transaction id to int: %v", err)
+		}
+	}
+	transactionID++
+
+	txTime := time.Now().UTC().Format(time.RFC3339)
+	if ts, tsErr := ctx.GetStub().GetTxTimestamp(); tsErr == nil {
+		txTime = time.Unix(ts.Seconds, int64(ts.Nanos)).UTC().Format(time.RFC3339)
+	}
+
 	transaction := Transaction{
-		Transaction_ID:  strconv.Itoa(transaction_id),
+		Transaction_ID:  strconv.Itoa(transactionID),
 		Sender_Bank:     src.Bank_Name,
 		Sender_Acc_No:   src_bank_acc_no,
 		Receiver_Bank:   receiver.Bank_Name,
 		Receiver_Acc_No: receiver_bank_acc_no,
 		Amount:          amount,
-		Currency:        src.Currency,
+		Currency:        srcBank.Currency,
+		Timestamp:       txTime,
 	}
 	transactionJSON, err := json.Marshal(transaction)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal transaction: %v", err)
 	}
-	err = ctx.GetStub().PutPrivateData("Transaction_Collections", strconv.Itoa(transaction_id), transactionJSON)
+	err = ctx.GetStub().PutPrivateData("Transaction_Collections", strconv.Itoa(transactionID), transactionJSON)
 	if err != nil {
-		return "", fmt.Errorf("failed to update transaction %s is world state: %v", strconv.Itoa(transaction_id), err)
+		return "", fmt.Errorf("failed to update transaction %s is world state: %v", strconv.Itoa(transactionID), err)
 	}
 
-	//Updating last transaction id
-	err = ctx.GetStub().PutPrivateData("Transaction_Collections", "last_id", []byte(strconv.Itoa(transaction_id)))
+	err = ctx.GetStub().PutPrivateData("Transaction_Collections", "last_id", []byte(strconv.Itoa(transactionID)))
 	if err != nil {
 		return "", fmt.Errorf("failed to update last transaction id in world state but transaction pushed: %v", err)
 	}
-	return strconv.Itoa(transaction_id), nil
+
+	last_id = strconv.Itoa(transactionID)
+	return strconv.Itoa(transactionID), nil
 }
 
 func (s *SmartContract) MakePayment(ctx contractapi.TransactionContextInterface, src_bank string, src_bank_acc_no string, receiver_bank string, receiver_bank_acc_no string, amount float64) (string, error) {
@@ -305,15 +378,15 @@ func (s *SmartContract) MakePayment(ctx contractapi.TransactionContextInterface,
 	}
 	// checking if sender's account is present
 	if _, ok := src.Account_Map[src_bank_acc_no]; !ok {
-		// create sender's account
 		_, err = s.CreateAccount(ctx, src.Bank_Name, src.Currency, src_bank_acc_no)
-		// fmt.Println("\nAccount Created\n")
 		if err != nil {
 			return "", fmt.Errorf("failed to create sender's account: %v", err)
 		}
+		src, err = loadBank(ctx, src_bank)
+		if err != nil {
+			return "", err
+		}
 	}
-
-	//to be modified
 
 	var curr_src string = src.Currency
 
@@ -333,14 +406,16 @@ func (s *SmartContract) MakePayment(ctx contractapi.TransactionContextInterface,
 
 	// checking if receiver's account is present
 	if _, ok := receiver.Account_Map[receiver_bank_acc_no]; !ok {
-		// create receiver's account
 		_, err = s.CreateAccount(ctx, receiver.Bank_Name, receiver.Currency, receiver_bank_acc_no)
 		if err != nil {
 			return "", fmt.Errorf("failed to create receiver's account: %v", err)
 		}
+		receiver, err = loadBank(ctx, receiver_bank)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	// var curr_receiver string = receiver.Currency
 	var balance = src.Account_Map[src_bank_acc_no].Balance
 	if src.Currency == receiver.Currency {
 		if amount < 0 {
@@ -348,10 +423,17 @@ func (s *SmartContract) MakePayment(ctx contractapi.TransactionContextInterface,
 		}
 		if balance < amount {
 			return "", fmt.Errorf("insufficient Balance in Sender's Account")
-		} else {
-			var trans string
-			//first I am sending from src bank to central bank all amt.
-			if curr_src == "USD" {
+		}
+
+		// Same bank: one atomic ledger update (avoids stale private-data reads
+		// when chaining multiple execute calls in a single invocation).
+		if src_bank == receiver_bank {
+			return execute(ctx, src, src_bank_acc_no, receiver, receiver_bank_acc_no, amount, 1)
+		}
+
+		var trans string
+		//first I am sending from src bank to central bank all amt.
+		if curr_src == "USD" {
 				boa_JSON, err := ctx.GetStub().GetPrivateData("Bank_Collections", "BOA")
 				if err != nil {
 					return "", fmt.Errorf("failed to connect to america's central bank.%s: %v", "BOA", err)
@@ -400,7 +482,6 @@ func (s *SmartContract) MakePayment(ctx contractapi.TransactionContextInterface,
 				fmt.Printf("New_amt is:3\n")
 				return trans, nil
 			}
-		}
 	} else {
 		if curr_src == "USD" {
 			if amount < 0 {

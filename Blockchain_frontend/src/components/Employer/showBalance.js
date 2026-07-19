@@ -1,4 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState,
+  forwardRef,
+} from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { parseQueryResponse } from "../../utils/parseQueryResponse";
@@ -13,7 +19,17 @@ const BANK_NAMES = {
 const getBankDisplayName = (code) =>
   BANK_NAMES[code] ? `${BANK_NAMES[code]} (${code})` : code;
 
-const ShowBalance = ({ logeduserid }) => {
+const formatBalance = (value) => {
+  const numeric = Number(value);
+  if (!Number.isNaN(numeric)) {
+    return numeric.toLocaleString(undefined, {
+      maximumFractionDigits: 2,
+    });
+  }
+  return value;
+};
+
+const ShowBalance = forwardRef(({ logeduserid, refreshKey = 0 }, ref) => {
   const [bankDetails, setBankDetails] = useState(null);
   const [loadingBank, setLoadingBank] = useState(true);
   const [showBalance, setShowBalance] = useState(false);
@@ -49,39 +65,58 @@ const ShowBalance = ({ logeduserid }) => {
     }
   }, [logeduserid]);
 
-  const fetchBalance = async () => {
-    if (!bankDetails) return;
+  const fetchBalance = useCallback(
+    async ({ keepVisible = true, reveal = false } = {}) => {
+      if (!bankDetails) return;
 
-    setLoadingBalance(true);
-    try {
-      const params = new URLSearchParams();
-      params.append("channelid", "mychannel");
-      params.append("chaincodeid", "paytest");
-      params.append("function", "ViewBalance");
-      params.append("args", bankDetails.BankName);
-      params.append("args", bankDetails.BankAccountNumber);
+      setLoadingBalance(true);
+      try {
+        const params = new URLSearchParams();
+        params.append("channelid", "mychannel");
+        params.append("chaincodeid", "paytest");
+        params.append("function", "ViewBalance");
+        params.append("args", bankDetails.BankName);
+        params.append("args", bankDetails.BankAccountNumber);
 
-      const response = await axios.get("http://localhost:3002/query", {
-        params,
-      });
+        const response = await axios.get("http://localhost:3002/query", {
+          params,
+        });
 
-      const jsonData = parseQueryResponse(response.data);
-      setBalance(jsonData);
-      setShowBalance(true);
-    } catch (error) {
-      toast.error("Could not fetch balance");
-      console.error("Failed to fetch balance:", error);
-    } finally {
-      setLoadingBalance(false);
+        const jsonData = parseQueryResponse(response.data);
+        setBalance(jsonData);
+        if (reveal || keepVisible) {
+          setShowBalance(true);
+        }
+      } catch (error) {
+        toast.error("Could not fetch balance");
+        console.error("Failed to fetch balance:", error);
+      } finally {
+        setLoadingBalance(false);
+      }
+    },
+    [bankDetails]
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      refreshBalance: () => fetchBalance({ keepVisible: true, reveal: true }),
+    }),
+    [fetchBalance]
+  );
+
+  useEffect(() => {
+    if (refreshKey > 0 && bankDetails) {
+      fetchBalance({ keepVisible: true, reveal: true });
     }
-  };
+  }, [refreshKey, bankDetails, fetchBalance]);
 
   const handleToggle = () => {
     if (showBalance) {
       setShowBalance(false);
       return;
     }
-    fetchBalance();
+    fetchBalance({ keepVisible: true, reveal: true });
   };
 
   return (
@@ -101,7 +136,7 @@ const ShowBalance = ({ logeduserid }) => {
           {loadingBalance
             ? "Loading..."
             : showBalance
-            ? "Hide Balance"
+            ? "Refresh Balance"
             : "View Balance"}
         </button>
       </div>
@@ -128,11 +163,7 @@ const ShowBalance = ({ logeduserid }) => {
           <>
             <div className="balance-divider" />
             <p className="balance-label">Available balance</p>
-            <p className="balance-amount">
-              {typeof balance === "number"
-                ? balance.toLocaleString()
-                : balance}
-            </p>
+            <p className="balance-amount">{formatBalance(balance)}</p>
           </>
         ) : (
           !loadingBank &&
@@ -145,6 +176,8 @@ const ShowBalance = ({ logeduserid }) => {
       </div>
     </div>
   );
-};
+});
+
+ShowBalance.displayName = "ShowBalance";
 
 export default ShowBalance;

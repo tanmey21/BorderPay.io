@@ -1,179 +1,205 @@
-import React, { useEffect, useState } from 'react'
-import AdminNavbar from './adminNavbar'
-import axios from 'axios';
-import "../Employee/contracts.css";
-import CreateContract from './createContract';
+import React, { useCallback, useEffect, useState } from "react";
+import AdminNavbar from "./adminNavbar";
+import axios from "axios";
+import CreateContract from "./createContract";
 import toast from "react-hot-toast";
-import ShowBalance from './showBalance';
-import { parseQueryResponse } from '../../utils/parseQueryResponse';
+import ShowBalance from "./showBalance";
+import { parseQueryResponse } from "../../utils/parseQueryResponse";
+import "./employerDashboard.css";
+
+const getStatusClass = (status) => {
+  if (status === "Pending") return "status-pending";
+  if (status === "Accepted") return "status-accepted";
+  if (status === "Revoked") return "status-revoked";
+  return "status-default";
+};
+
 const AdminHome = () => {
+  const logeduserid = window.localStorage.getItem("userId");
+  const [createdContracts, setCreatedContracts] = useState([]);
+  const [loadingContracts, setLoadingContracts] = useState(true);
 
-  const  logeduserid = window.localStorage.getItem("userId");
-  const [createdContracts, setCreatedContracts] = useState([
-    // {// {
-    // //   ContractID: "contractId",
-    // //   EmployerId: "employerId",
-    // //   EmployeeId: "employeeId",
-    // //   Payment: 1000,
-    // //   Duration: 12,
-    // //   BankName_Employer: "employerBankName",
-    // //   BankAccountNumber_Employer: "employerBankAccountNumber",
-    // //   BankName_Employee: "employeeBankName",
-    // //   BankAccountNumber_Employee: "employeeBankAccountNumber",
-    // //   STATUS: "active",
-    // //   Last_Payment_Date: "2022-01-01",
-    // //   All_Transactions: []
-    // },{
-    //   ContractID: "contractId",
-    //   EmployerId: "employerId",
-    //   EmployeeId: "employeeId",
-    //   Payment: 1000,
-    //   Duration: 12,
-    //   BankName_Employer: "employerBankName",
-    //   BankAccountNumber_Employer: "employerBankAccountNumber",
-    //   BankName_Employee: "employeeBankName",
-    //   BankAccountNumber_Employee: "employeeBankAccountNumber",
-    //   STATUS: "active",
-    //   Last_Payment_Date: "2022-01-01",
-    //   All_Transactions: []
-    // }
-  ]);
-  const [flag , setFlag] = useState(true);
+  const fetchContracts = useCallback(async () => {
+    try {
+      const response = await axios.get("http://localhost:3002/query", {
+        params: {
+          channelid: "mychannel",
+          chaincodeid: "basictest",
+          function: "FetchAllContractsbyUserID",
+          args: logeduserid,
+        },
+      });
 
-  const handlePayment = async (b1,bn1,b2,bn2,pay,status) => {
-    if(status === "Pending" || status === "Revoked"){
+      const jsonData = parseQueryResponse(response.data) ?? [];
+      setCreatedContracts(jsonData);
+    } catch (error) {
+      toast.error("Error fetching contracts");
+      console.error("Error fetching contracts:", error);
+    } finally {
+      setLoadingContracts(false);
+    }
+  }, [logeduserid]);
+
+  useEffect(() => {
+    fetchContracts();
+  }, [fetchContracts]);
+
+  const handlePayment = async (b1, bn1, b2, bn2, pay, status) => {
+    if (status === "Pending" || status === "Revoked") {
       toast.error("Contract is inactive");
       return;
     }
     try {
-      const response = await axios.post(
-        'http://localhost:3002/invoke',
+      await axios.post(
+        "http://localhost:3002/invoke",
         new URLSearchParams([
-          ['', ''],
-          ['channelid', 'mychannel'],
-          ['chaincodeid', 'paytest'],
-          ['function', 'MakePayment'],
-          ['args', b1],
-          ['args', bn1],
-          ['args', b2],
-          ['args', bn2],
-          ['args', pay]
+          ["", ""],
+          ["channelid", "mychannel"],
+          ["chaincodeid", "paytest"],
+          ["function", "MakePayment"],
+          ["args", b1],
+          ["args", bn1],
+          ["args", b2],
+          ["args", bn2],
+          ["args", pay],
         ])
       );
-      console.log('Payment successful:', response.data);
-      toast.success("Payment succesful");
+      toast.success("Payment successful");
     } catch (error) {
       toast.error("Payment failed");
-      console.error('Error making payment:', error);
+      console.error("Error making payment:", error);
     }
   };
 
   const handleRevoke = async (contract_id) => {
     try {
-      const response = await axios.post(
-        'http://localhost:3002/invoke',
+      await axios.post(
+        "http://localhost:3002/invoke",
         new URLSearchParams([
-          ['', ''],
-          ['channelid', 'mychannel'],
-          ['chaincodeid', 'basictest'],
-          ['function', 'RevokeContract'],
-          ['args', contract_id],
+          ["", ""],
+          ["channelid", "mychannel"],
+          ["chaincodeid", "basictest"],
+          ["function", "RevokeContract"],
+          ["args", contract_id],
         ])
       );
-      console.log('Revoke successful:', response);
-      toast.success("Revoke succesful");
-
+      toast.success("Contract revoked");
+      fetchContracts();
     } catch (error) {
       toast.error("Revoke failed");
-      console.error('Error making revoke', error);
+      console.error("Error making revoke", error);
     }
   };
 
+  const isPaymentDisabled = (status) =>
+    status === "Pending" || status === "Revoked";
 
+  return (
+    <div className="employer-page">
+      <AdminNavbar />
 
+      <main className="employer-main">
+        <header className="employer-header">
+          <div>
+            <h1>Employer Dashboard</h1>
+            <p>Manage contracts and send cross-border payments to your team.</p>
+          </div>
+          <div className="employer-user-badge">
+            Signed in as <span>{logeduserid}</span>
+          </div>
+        </header>
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        
-
-        const response = await axios.get('http://localhost:3002/query', {
-          params: {
-          'channelid': 'mychannel',
-          'chaincodeid': 'basictest',
-          'function': 'FetchAllContractsbyUserID',
-          'args': logeduserid
-          }
-        });
-        
-        console.log(response);
-        console.log("this" , response.data);
-
-        const jsonData = parseQueryResponse(response.data) ?? [];
-        
-        setCreatedContracts(jsonData);
-
-
-      } catch (error) {
-        toast.error("Error fetching contracts");
-        console.error('Error fetching contracts:', error);
-      }
-    };
-
-    fetchData();
-    if(createdContracts){
-      setFlag(true);
-    }
-  }, []);
-
-  
-
-
-
-
-    return (
-    <div>
-    <AdminNavbar/>
-    <CreateContract/>
-    <hr/>
-    <ShowBalance logeduserid={logeduserid} />
-
-    <hr />
-    <h1 style={{textAlign: 'center'}}>Your Contracts</h1>
-    {flag ? createdContracts.map((contract,index) => (
-        <div key={index} className="appointment-box">
-        <span>
-              <strong>ContractId</strong> {contract.ContractID}&nbsp;&nbsp;
-              <strong>EmployeeId</strong> {contract.EmployeeId}&nbsp;&nbsp;
-              <strong>Payment</strong> {contract.Payment}&nbsp;&nbsp;
-              <strong>Duration</strong> {contract.Duration}&nbsp;&nbsp;
-              <strong>STATUS</strong> {contract.STATUS}&nbsp;&nbsp;
-
-
-        </span>&nbsp;&nbsp;&nbsp;
-        <button
-          className="view-prescription-button"
-          id="view-prescription"  
-          onClick={()=>handlePayment(contract.BankName_Employer,contract.BankAccountNumber_Employer,contract.BankName_Employee,contract.BankAccountNumber_Employee,contract.Payment,contract.STATUS)}
-          >
-          Payment
-        </button>
-        <button
-          className="view-prescription-button"
-          id="view-prescription"  
-          
-          onClick={()=>handleRevoke(contract.ContractID)}
-        >
-          Revoke
-        </button>
+        <div className="employer-grid">
+          <CreateContract onContractCreated={fetchContracts} />
+          <ShowBalance logeduserid={logeduserid} />
         </div>
-        
-      )) : <p>No entries to display</p>}
 
+        <section className="contracts-section">
+          <div className="dashboard-card-header" style={{ marginBottom: "1rem" }}>
+            <div>
+              <h2 className="dashboard-card-title">Your Contracts</h2>
+              <p className="dashboard-card-subtitle">
+                {createdContracts.length} active agreement
+                {createdContracts.length !== 1 ? "s" : ""} on the ledger
+              </p>
+            </div>
+            <button className="btn-secondary" onClick={fetchContracts}>
+              Refresh
+            </button>
+          </div>
 
-    
+          {loadingContracts ? (
+            <div className="contracts-empty">
+              <p>Loading contracts...</p>
+            </div>
+          ) : createdContracts.length === 0 ? (
+            <div className="contracts-empty">
+              <h3>No contracts yet</h3>
+              <p>Create your first contract above to start paying employees.</p>
+            </div>
+          ) : (
+            <div className="contracts-list">
+              {createdContracts.map((contract, index) => (
+                <article key={index} className="contract-card">
+                  <div className="contract-details">
+                    <div className="contract-field">
+                      <label>Contract ID</label>
+                      <span>{contract.ContractID}</span>
+                    </div>
+                    <div className="contract-field">
+                      <label>Employee ID</label>
+                      <span>{contract.EmployeeId}</span>
+                    </div>
+                    <div className="contract-field">
+                      <label>Payment</label>
+                      <span>{contract.Payment?.toLocaleString?.() ?? contract.Payment}</span>
+                    </div>
+                    <div className="contract-field">
+                      <label>Duration</label>
+                      <span>{contract.Duration} months</span>
+                    </div>
+                    <div className="contract-field">
+                      <label>Status</label>
+                      <span
+                        className={`status-badge ${getStatusClass(contract.STATUS)}`}
+                      >
+                        {contract.STATUS}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="contract-actions">
+                    <button
+                      className="btn-pay"
+                      disabled={isPaymentDisabled(contract.STATUS)}
+                      onClick={() =>
+                        handlePayment(
+                          contract.BankName_Employer,
+                          contract.BankAccountNumber_Employer,
+                          contract.BankName_Employee,
+                          contract.BankAccountNumber_Employee,
+                          contract.Payment,
+                          contract.STATUS
+                        )
+                      }
+                    >
+                      Send Payment
+                    </button>
+                    <button
+                      className="btn-revoke"
+                      onClick={() => handleRevoke(contract.ContractID)}
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
     </div>
-    )
-}
+  );
+};
 
-export default AdminHome
+export default AdminHome;
